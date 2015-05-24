@@ -1,43 +1,7 @@
 (ns ocr.core
-  (:use [clojure.java.shell :only (sh)]))
+  (:use [clojure.java.shell :only (sh)]
+        [clojure.string :only [trim split]]))
 
-(defn load-char-file [file]
-  (let [filename file
-        tokens   (split filename #"[_/\.]")
-        label    (nth tokens 2)
-        contents (parse-char-row (slurp file))]
-    [label contents]))
-
-(load-char-file "data/in/5.png")
-(classify  (load-char-file "data/in/7.png"))
-
-(def temp-outfile "/tmp/clj-converted.txt")
-
-(defn classify-image [filename]
-  (convert-image filename temp-outfile)
-  (classify (load-char-file temp-outfile)))
-
-(classify-image "data/in/3.png")
-
-(defn sample [n]
-  (println "I think that is the number" (classify-image (str "data/in/" n ".png"))))
-
-(sample "5")
-
-(defn -main [& args]
-  (doseq [filename args]
-    (println "I think that is the number" (classify-image filename))))
-
-;; Base Conversion
-(defn convert-image
-  [in out]
-  (sh "convert" in "-colorspace" "gray" "+dither" "-colors" "2"
-      "-normalize" "-resize" "32x32!" out)
-  (spit out (apply str (load-text-image out))))
-
-(convert-image "data/in/5.png" "/tmp/5.txt")
-
-(map #(convert (str "data/in/" % ".png") (str "data/out/" % ".txt")) (range 0 9))
 
 ;; Conversion for ImageMagik text files
 (defn read-text-image-line [line]
@@ -49,11 +13,21 @@
         converted (map read-text-image-line lines) ]
     (map #(apply str %) (partition 32 converted))))
 
-(load-text-image "data/out/5.txt")
+;; (load-text-image "data/out/5.txt")
+
+;; Base Conversion
+(defn convert-image
+  [in out]
+  (sh "convert" in "-colorspace" "gray" "+dither" "-colors" "2"
+      "-normalize" "-resize" "32x32!" out))
+
+;; (convert-image "data/in/5.png" "5.png")
+;; (sh "open" "5.png")
+
+;; (map #(convert (str "data/in/" % ".png") (str "data/out/" % ".txt")) (range 0 9))
 
 ;; Training Data
 
-(use '[clojure.string :only (join split trim)])
 (defn parse-char-row [row]
   (map #(Integer/parseInt %) (filter #(or (= % "1") (= % "0")) (split row #""))))
 
@@ -85,9 +59,45 @@
           distance    (Math/sqrt (sum-of-squares vector-diff))]
     [label distance])))
 
+;; (map (calculate-distances in) training-set)
+
 (defn classify [in]
   (let [k                  10
         diffs              (map (calculate-distances in) training-set)
         nearest-neighbours (frequencies (map first (take k (sort-by last diffs))))
         classification     (first (last (sort-by second nearest-neighbours)))]
+    ;;    (println diffs)
+    ;;    (println nearest-neighbours)
     classification))
+
+
+;; Application
+
+(defn load-char-file [file]
+  (let [filename file
+        tokens   (split filename #"[_/\.]")
+        label    (nth tokens 2)
+        contents (parse-char-row (slurp file))]
+    [label contents]))
+
+;; (load-char-file "data/in/5.png")
+;; (classify  (load-char-file "data/in/7.png")))
+
+(def temp-outfile "/tmp/clj-converted.txt")
+(def temp-processed "/tmp/clj-processed.txt")
+
+(defn classify-image [filename]
+  (convert-image filename temp-outfile)
+  (spit temp-processed (apply str (load-text-image filename)))
+  (classify (load-char-file temp-processed)))
+
+;; (classify-image "data/in/3.png")
+
+;; (sample "5")
+
+(defn -main [& args]
+  (doseq [filename args]
+    (let [out "/tmp/clj-converted.png"]
+      (convert-image filename out)
+      (sh "open" out)
+      (println "I think that" filename "is the number" (classify-image filename)))))
