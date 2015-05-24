@@ -89,5 +89,5 @@
 
 (defn -main [& args]
   (doseq [filename args]
-    (println "I think that" filename "is the number" (classify-image filename)))
+    (println filename "is the number" (classify-image filename)))
   (System/exit 0))
