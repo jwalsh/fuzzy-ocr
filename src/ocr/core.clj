@@ -57,22 +57,23 @@
     (let [vector-diff (minus-vector (last in) (last row))
           label       (first row)
           distance    (Math/sqrt (sum-of-squares vector-diff))]
+      ;; (println "Processing" label "with a distance of" distance)
     [label distance])))
 
 ;; Application
 (defn load-char-file [filename]
+  (println (slurp filename))
   (let [tokens   (split filename #"[_/\.]")
         label    (nth tokens 2)
         contents (parse-char-row (slurp filename))]
-    [label contents]))
+    [(str label) contents]))
 
 (defn classify [in]
-  (let [k                  10
+  (let [k                  1000
         diffs              (map (calculate-distances in) training-set)
         nearest-neighbours (frequencies (map first (take k (sort-by last diffs))))
         classification     (first (last (sort-by second nearest-neighbours)))]
-    ;; (println diffs)
-    (println nearest-neighbours)
+    (println "Frequency of nearest neighbors: "  nearest-neighbours)
     classification))
 
 (defn classify-image [filename]
@@ -82,11 +83,11 @@
     (convert-image filename temp-outfile)
     (convert-image filename temp-png)
     (export-text-image temp-outfile temp-exported)
-    ;;    (sh "open" temp-png temp-outfile)
-    (classify (load-char-file temp-outfile))))
+    (classify (load-char-file temp-exported))))
 
 ;; (quote (classify-image "data/in/2.png"))
 
 (defn -main [& args]
   (doseq [filename args]
-    (println "I think that" filename "is the number" (classify-image filename))))
+    (println "I think that" filename "is the number" (classify-image filename)))
+  (System/exit 0))
